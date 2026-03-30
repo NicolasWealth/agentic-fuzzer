@@ -2,31 +2,23 @@ import { useState, useCallback } from "react";
 import { Shield, Bug, Radar, Crosshair } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import StatCard from "@/components/StatCard";
 import ActivityLog from "@/components/ActivityLog";
+import AttackResults from "@/components/AttackResults";
+import { supabase } from "@/integrations/supabase/client";
 
-const SIMULATED_LOGS = [
-  "Initializing attack surface reconnaissance...",
-  "Resolving target DNS records...",
-  "Enumerating API endpoints via OpenAPI spec...",
-  "Testing /api/v1/users — 200 OK",
-  "Testing /api/v1/auth/login — 200 OK",
-  "⚠ IDOR vulnerability detected on /api/v1/users/{id}",
-  "Testing /api/v1/admin — 403 Forbidden",
-  "Attempting privilege escalation via JWT manipulation...",
-  "⚠ Broken access control on /api/v1/admin/config",
-  "Testing rate limiting on /api/v1/auth/login...",
-  "⚠ No rate limiting detected — brute force possible",
-  "Scanning for SQL injection vectors...",
-  "Testing /api/v1/search?q=' OR 1=1 --",
-  "✓ SQL injection mitigated on /api/v1/search",
-  "Testing CORS configuration...",
-  "⚠ Wildcard CORS origin detected",
-  "Fuzzing request headers with malformed payloads...",
-  "Testing for SSRF via /api/v1/webhook endpoint...",
-  "✓ SSRF protections in place",
-  "Scan complete. Generating threat report...",
-];
+interface AttackPayload {
+  attack_type: string;
+  severity: "critical" | "high" | "medium" | "low";
+  payload: Record<string, unknown> | string;
+  expected_vulnerability: string;
+}
+
+interface EndpointAnalysis {
+  endpoint: string;
+  payloads: AttackPayload[];
+}
 
 const Index = () => {
   const [url, setUrl] = useState("");
@@ -35,29 +27,67 @@ const Index = () => {
   const [vulns, setVulns] = useState(0);
   const [endpoints, setEndpoints] = useState(0);
   const [score, setScore] = useState(100);
+  const [results, setResults] = useState<EndpointAnalysis[]>([]);
 
-  const runSimulation = useCallback(() => {
+  const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
+
+  const runSimulation = useCallback(async () => {
     if (!url.trim() || isRunning) return;
     setIsRunning(true);
     setLogs([]);
     setVulns(0);
     setEndpoints(0);
     setScore(100);
+    setResults([]);
 
-    let idx = 0;
-    const interval = setInterval(() => {
-      if (idx >= SIMULATED_LOGS.length) {
-        clearInterval(interval);
-        setIsRunning(false);
-        return;
+    addLog("Initializing attack surface reconnaissance...");
+    addLog(`Target: ${url}`);
+    addLog("Connecting to AI red team engine...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("red-team-analyze", {
+        body: { apiUrl: url },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Edge function call failed");
       }
-      const log = SIMULATED_LOGS[idx];
-      setLogs((prev) => [...prev, log]);
-      if (log.startsWith("⚠")) setVulns((v) => v + 1);
-      if (log.includes("Testing /")) setEndpoints((e) => e + 1);
-      if (log.startsWith("⚠")) setScore((s) => Math.max(0, s - 12));
-      idx++;
-    }, 400);
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const analysisResults: EndpointAnalysis[] = data.results || [];
+      addLog(`AI analysis complete. ${analysisResults.length} endpoints analyzed.`);
+
+      let vulnCount = 0;
+      let epCount = analysisResults.length;
+
+      analysisResults.forEach((ep) => {
+        const method = ep.endpoint.split(" ")[0] || "GET";
+        const path = ep.endpoint.split(" ").slice(1).join(" ") || "/";
+        addLog(`Scanning ${method} ${path}...`);
+
+        ep.payloads.forEach((p) => {
+          vulnCount++;
+          const icon = p.severity === "critical" || p.severity === "high" ? "⚠" : "✓";
+          addLog(`${icon} [${p.severity.toUpperCase()}] ${p.attack_type} on ${ep.endpoint}`);
+        });
+      });
+
+      setVulns(vulnCount);
+      setEndpoints(epCount);
+      setScore(Math.max(0, 100 - vulnCount * 5));
+      setResults(analysisResults);
+
+      addLog("Scan complete. Threat report generated.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      addLog(`✗ Error: ${msg}`);
+      toast.error(msg);
+    } finally {
+      setIsRunning(false);
+    }
   }, [url, isRunning]);
 
   return (
@@ -114,12 +144,15 @@ const Index = () => {
           onClick={runSimulation}
           disabled={isRunning || !url.trim()}
         >
-          {isRunning ? "Scanning..." : "Initialize Attack Simulation"}
+          {isRunning ? "Analyzing..." : "Initialize Attack Simulation"}
         </Button>
       </div>
 
       {/* Activity Log */}
       <ActivityLog logs={logs} />
+
+      {/* Attack Results */}
+      <AttackResults results={results} />
     </div>
   );
 };
