@@ -81,6 +81,52 @@ const Index = () => {
       setResults(analysisResults);
 
       addLog("Scan complete. Threat report generated.");
+      addLog("");
+      addLog("═══ PHASE 2: Executing payloads against target ═══");
+
+      try {
+        const { data: execData, error: execError } = await supabase.functions.invoke("red-team-execute", {
+          body: { apiUrl: url, attacks: analysisResults },
+        });
+
+        if (execError) {
+          addLog(`✗ Execution error: ${execError.message}`);
+        } else if (execData?.results) {
+          const execResults = execData.results as Array<{
+            endpoint: string;
+            attack_type: string;
+            severity: string;
+            status: number | null;
+            vulnerable: boolean;
+            error: string | null;
+            response_snippet: string;
+          }>;
+
+          let confirmedVulns = 0;
+          execResults.forEach((r) => {
+            if (r.error) {
+              addLog(`⊘ [TIMEOUT] ${r.attack_type} → ${r.endpoint} — ${r.error}`);
+            } else if (r.vulnerable) {
+              confirmedVulns++;
+              addLog(`⚠ POTENTIAL VULNERABILITY FOUND — ${r.attack_type} → ${r.endpoint} (HTTP ${r.status})`);
+            } else {
+              addLog(`✓ [${r.status}] ${r.attack_type} → ${r.endpoint} — No server error`);
+            }
+          });
+
+          if (confirmedVulns > 0) {
+            addLog(`\n⚠ ${confirmedVulns} potential vulnerabilities confirmed via 500 responses!`);
+            setVulns(confirmedVulns);
+            setScore(Math.max(0, 100 - confirmedVulns * 15));
+          } else {
+            addLog("✓ No 500 errors detected. Target appears resilient.");
+          }
+        }
+      } catch (execErr) {
+        const execMsg = execErr instanceof Error ? execErr.message : "Unknown error";
+        addLog(`✗ Execution phase error: ${execMsg}`);
+      }
+
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       addLog(`✗ Error: ${msg}`);
