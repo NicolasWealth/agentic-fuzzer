@@ -86,6 +86,14 @@ const Index = () => {
           if (response.status === 500 || response.status === 403) {
             exploitCount++;
             setVulns(exploitCount);
+            setExploits((prev) => [...prev, {
+              endpoint: ep.endpoint,
+              attack_type: p.attack_type,
+              severity: p.severity,
+              payload: payloadBody,
+              reasoning: p.expected_vulnerability,
+              status: response.status,
+            }]);
             addLog(`🔴 [SUCCESSFUL EXPLOIT] ${p.attack_type} → ${ep.endpoint} (HTTP ${response.status})`);
           } else if (response.status === 200) {
             addLog(`🟢 [VULNERABILITY NOT FOUND] ${p.attack_type} → ${ep.endpoint} (HTTP 200)`);
