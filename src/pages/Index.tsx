@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Shield, Bug, Radar, Crosshair } from "lucide-react";
+import { Shield, Bug, Radar, Crosshair, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
