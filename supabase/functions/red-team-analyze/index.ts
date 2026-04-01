@@ -88,16 +88,29 @@ serve(async (req) => {
     const data = await response.json();
     const rawText = data.choices?.[0]?.message?.content || "";
 
-    // Clean markdown fences if present
-    const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-
+    // Extract JSON from response robustly
     let results;
     try {
-      results = JSON.parse(cleaned);
+      let cleaned = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const jsonStart = cleaned.indexOf("[");
+      const jsonEnd = cleaned.lastIndexOf("]");
+      if (jsonStart === -1 || jsonEnd === -1) {
+        throw new Error("No JSON array found");
+      }
+      cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      try {
+        results = JSON.parse(cleaned);
+      } catch {
+        cleaned = cleaned
+          .replace(/,\s*}/g, "}")
+          .replace(/,\s*]/g, "]")
+          .replace(/[\x00-\x1F\x7F]/g, "");
+        results = JSON.parse(cleaned);
+      }
     } catch {
-      console.error("Failed to parse AI response:", cleaned);
+      console.error("Failed to parse AI response:", rawText.substring(0, 500));
       return new Response(
-        JSON.stringify({ error: "Failed to parse AI response" }),
+        JSON.stringify({ error: "Failed to parse AI response. The AI may not have returned valid JSON. Please try again." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
