@@ -123,6 +123,7 @@ const Index = () => {
     setEndpoints(0);
     setScore(100);
     setResults([]);
+    setExploits([]);
 
     addLog("Initializing attack surface reconnaissance...");
     addLog(`Target: ${url}`);
