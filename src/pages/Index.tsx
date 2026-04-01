@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Shield, Bug, Radar, Crosshair } from "lucide-react";
+import { Shield, Bug, Radar, Crosshair, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -15,6 +15,15 @@ interface AttackPayload {
   expected_vulnerability: string;
 }
 
+interface ExploitRecord {
+  endpoint: string;
+  attack_type: string;
+  severity: string;
+  payload: string;
+  reasoning: string;
+  status: number;
+}
+
 interface EndpointAnalysis {
   endpoint: string;
   payloads: AttackPayload[];
@@ -28,6 +37,7 @@ const Index = () => {
   const [endpoints, setEndpoints] = useState(0);
   const [score, setScore] = useState(100);
   const [results, setResults] = useState<EndpointAnalysis[]>([]);
+  const [exploits, setExploits] = useState<ExploitRecord[]>([]);
 
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
@@ -76,6 +86,14 @@ const Index = () => {
           if (response.status === 500 || response.status === 403) {
             exploitCount++;
             setVulns(exploitCount);
+            setExploits((prev) => [...prev, {
+              endpoint: ep.endpoint,
+              attack_type: p.attack_type,
+              severity: p.severity,
+              payload: payloadBody,
+              reasoning: p.expected_vulnerability,
+              status: response.status,
+            }]);
             addLog(`🔴 [SUCCESSFUL EXPLOIT] ${p.attack_type} → ${ep.endpoint} (HTTP ${response.status})`);
           } else if (response.status === 200) {
             addLog(`🟢 [VULNERABILITY NOT FOUND] ${p.attack_type} → ${ep.endpoint} (HTTP 200)`);
@@ -105,6 +123,7 @@ const Index = () => {
     setEndpoints(0);
     setScore(100);
     setResults([]);
+    setExploits([]);
 
     addLog("Initializing attack surface reconnaissance...");
     addLog(`Target: ${url}`);
@@ -217,6 +236,43 @@ const Index = () => {
         >
           {isRunning ? "Analyzing..." : "Initialize Attack Simulation"}
         </Button>
+        {exploits.length > 0 && (
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-12 px-6 border-primary/30 text-primary hover:bg-primary/10"
+            onClick={() => {
+              const lines = [
+                `# Agentic Fuzzer — Exploit Report`,
+                `**Target:** ${url}`,
+                `**Date:** ${new Date().toISOString()}`,
+                `**Exploits Found:** ${exploits.length}`,
+                ``,
+                `---`,
+                ``,
+              ];
+              exploits.forEach((e, i) => {
+                lines.push(`## ${i + 1}. ${e.attack_type}`);
+                lines.push(`- **Endpoint:** ${e.endpoint}`);
+                lines.push(`- **Severity:** ${e.severity.toUpperCase()}`);
+                lines.push(`- **HTTP Status:** ${e.status}`);
+                lines.push(`- **Payload:** \`${e.payload}\``);
+                lines.push(`- **Reasoning:** ${e.reasoning}`);
+                lines.push(``);
+              });
+              const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `fuzzer-report-${Date.now()}.md`;
+              a.click();
+              URL.revokeObjectURL(a.href);
+              toast.success("Report downloaded");
+            }}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download Report
+          </Button>
+        )}
       </div>
 
       {/* Activity Log */}
