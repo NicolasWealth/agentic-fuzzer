@@ -31,13 +31,13 @@ Every penetration test begins the same way — a security engineer stares at a l
 
 **Agentic Fuzzer eliminates that 20%.**
 
-It deploys Claude Sonnet as a reasoning engine — not a pattern-matcher — to study your API surface, infer the intent behind each endpoint, and generate contextually intelligent attack payloads that human testers would spend hours constructing. By the time your team opens their terminal, the groundwork is already laid.
+It deploys Claude Sonnet as a reasoning engine, not a pattern-matcher to study your API surface, infer the intent behind each endpoint, and generate contextually intelligent attack payloads that human testers would spend hours constructing. By the time your team opens their terminal, the groundwork is already laid.
 
 ---
 
 ## What It Does
 
-Agentic Fuzzer acts as an AI-powered **Red Team Strategist**. Feed it a list of API endpoints. It returns a structured, prioritized attack plan — complete with malicious payloads, vulnerability classifications, and severity ratings — ready to fire.
+Agentic Fuzzer acts as an AI-powered **Red Team Strategist**. Feed it a list of API endpoints. It returns a structured, prioritized attack plan complete with malicious payloads, vulnerability classifications, and severity ratings — ready to fire.
 
 ```
 Input:   POST /auth/login
@@ -72,7 +72,7 @@ No guessing. No boilerplate. Just signal.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-The core reasoning loop is powered by **Claude Sonnet**, which analyzes each endpoint's HTTP method, path semantics, parameter names, and likely backend behavior to select the most plausible attack vectors — not just throw a wordlist at the wall.
+The core reasoning loop is powered by **Claude Sonnet**, which analyzes each endpoint's HTTP method, path semantics, parameter names, and likely backend behavior to select the most plausible attack vectors, not just throw a wordlist at the wall.
 
 ---
 
@@ -81,7 +81,7 @@ The core reasoning loop is powered by **Claude Sonnet**, which analyzes each end
 | Capability | Description |
 |---|---|
 | **AI-Driven Payload Generation** | Claude Sonnet reasons about endpoint context to craft targeted, non-generic payloads |
-| **Batch Analysis** | Submit dozens of endpoints in a single pass — the strategist handles them in parallel |
+| **Batch Analysis** | Submit dozens of endpoints in a single pass, the strategist handles them in parallel |
 | **Multi-Vector Coverage** | SQL Injection, NoSQL Injection, Broken Authentication, IDOR, XSS, Path Traversal, RCE |
 | **Severity Classification** | Every payload is rated `critical / high / medium / low` with an explanation |
 | **Fuzzer-Ready Output** | JSON schema designed for direct integration into your HTTP fuzzing pipeline |
