@@ -31,6 +31,72 @@ const Index = () => {
 
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
+  const runAttackSimulation = useCallback(async (targetUrl: string, attacks: EndpointAnalysis[]) => {
+    const baseUrl = targetUrl.replace(/\/+$/, "");
+    let scannedCount = 0;
+    let exploitCount = 0;
+
+    for (const ep of attacks) {
+      const parts = ep.endpoint.split(" ");
+      const method = (parts[0] || "GET").toUpperCase();
+      const path = parts.slice(1).join(" ") || "/";
+      const fullUrl = path.startsWith("http") ? path : `${baseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
+
+      for (const p of ep.payloads) {
+        scannedCount++;
+        setEndpoints(scannedCount);
+
+        try {
+          const isBodyMethod = ["POST", "PUT", "PATCH"].includes(method);
+          const payloadBody = typeof p.payload === "object" ? JSON.stringify(p.payload) : String(p.payload);
+
+          let fetchUrl = fullUrl;
+          const fetchOptions: RequestInit = { method, headers: { "Content-Type": "application/json" } };
+
+          if (isBodyMethod) {
+            fetchOptions.body = payloadBody;
+          } else {
+            const sep = fetchUrl.includes("?") ? "&" : "?";
+            if (typeof p.payload === "object") {
+              const params = new URLSearchParams();
+              for (const [k, v] of Object.entries(p.payload as Record<string, unknown>)) {
+                params.set(k, String(v));
+              }
+              fetchUrl = `${fetchUrl}${sep}${params.toString()}`;
+            } else {
+              fetchUrl = `${fetchUrl}${sep}input=${encodeURIComponent(payloadBody)}`;
+            }
+          }
+
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 10000);
+          const response = await fetch(fetchUrl, { ...fetchOptions, signal: controller.signal });
+          clearTimeout(timeout);
+
+          if (response.status === 500 || response.status === 403) {
+            exploitCount++;
+            setVulns(exploitCount);
+            addLog(`🔴 [SUCCESSFUL EXPLOIT] ${p.attack_type} → ${ep.endpoint} (HTTP ${response.status})`);
+          } else if (response.status === 200) {
+            addLog(`🟢 [VULNERABILITY NOT FOUND] ${p.attack_type} → ${ep.endpoint} (HTTP 200)`);
+          } else {
+            addLog(`⚪ [HTTP ${response.status}] ${p.attack_type} → ${ep.endpoint}`);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Request failed";
+          addLog(`⊘ [TIMEOUT/ERROR] ${p.attack_type} → ${ep.endpoint} — ${msg}`);
+        }
+      }
+    }
+
+    setScore(Math.max(0, 100 - exploitCount * 15));
+    if (exploitCount > 0) {
+      addLog(`\n⚠ ${exploitCount} successful exploits confirmed!`);
+    } else {
+      addLog("✓ No exploitable vulnerabilities detected. Target appears resilient.");
+    }
+  }, []);
+
   const runSimulation = useCallback(async () => {
     if (!url.trim() || isRunning) return;
     setIsRunning(true);
@@ -84,49 +150,7 @@ const Index = () => {
       addLog("Scan complete. Threat report generated.");
       addLog("");
       addLog("═══ PHASE 2: Executing payloads against target ═══");
-
-      try {
-        const { data: execData, error: execError } = await supabase.functions.invoke("red-team-execute", {
-          body: { apiUrl: url, attacks: analysisResults },
-        });
-
-        if (execError) {
-          addLog(`✗ Execution error: ${execError.message}`);
-        } else if (execData?.results) {
-          const execResults = execData.results as Array<{
-            endpoint: string;
-            attack_type: string;
-            severity: string;
-            status: number | null;
-            vulnerable: boolean;
-            error: string | null;
-            response_snippet: string;
-          }>;
-
-          let confirmedVulns = 0;
-          execResults.forEach((r) => {
-            if (r.error) {
-              addLog(`⊘ [TIMEOUT] ${r.attack_type} → ${r.endpoint} — ${r.error}`);
-            } else if (r.vulnerable) {
-              confirmedVulns++;
-              addLog(`⚠ POTENTIAL VULNERABILITY FOUND — ${r.attack_type} → ${r.endpoint} (HTTP ${r.status})`);
-            } else {
-              addLog(`✓ [${r.status}] ${r.attack_type} → ${r.endpoint} — No server error`);
-            }
-          });
-
-          if (confirmedVulns > 0) {
-            addLog(`\n⚠ ${confirmedVulns} potential vulnerabilities confirmed via 500 responses!`);
-            setVulns(confirmedVulns);
-            setScore(Math.max(0, 100 - confirmedVulns * 15));
-          } else {
-            addLog("✓ No 500 errors detected. Target appears resilient.");
-          }
-        }
-      } catch (execErr) {
-        const execMsg = execErr instanceof Error ? execErr.message : "Unknown error";
-        addLog(`✗ Execution phase error: ${execMsg}`);
-      }
+      await runAttackSimulation(url, analysisResults);
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
