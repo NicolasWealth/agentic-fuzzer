@@ -15,6 +15,15 @@ interface AttackPayload {
   expected_vulnerability: string;
 }
 
+interface ExploitRecord {
+  endpoint: string;
+  attack_type: string;
+  severity: string;
+  payload: string;
+  reasoning: string;
+  status: number;
+}
+
 interface EndpointAnalysis {
   endpoint: string;
   payloads: AttackPayload[];
