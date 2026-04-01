@@ -66,12 +66,13 @@ const Index = () => {
       analysisResults.forEach((ep) => {
         const method = ep.endpoint.split(" ")[0] || "GET";
         const path = ep.endpoint.split(" ").slice(1).join(" ") || "/";
-        addLog(`Scanning ${method} ${path}...`);
+        addLog(`[SCANNING...] ${method} ${path}`);
 
         ep.payloads.forEach((p) => {
           vulnCount++;
-          const icon = p.severity === "critical" || p.severity === "high" ? "⚠" : "✓";
-          addLog(`${icon} [${p.severity.toUpperCase()}] ${p.attack_type} on ${ep.endpoint}`);
+          const payloadStr = typeof p.payload === "object" ? JSON.stringify(p.payload) : String(p.payload);
+          addLog(`[SCANNING...] [${p.severity.toUpperCase()}] ${p.attack_type} → ${payloadStr}`);
+          addLog(`             └─ ${p.expected_vulnerability}`);
         });
       });
 
