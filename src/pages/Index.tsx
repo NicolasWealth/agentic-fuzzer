@@ -37,6 +37,7 @@ const Index = () => {
   const [endpoints, setEndpoints] = useState(0);
   const [score, setScore] = useState(100);
   const [results, setResults] = useState<EndpointAnalysis[]>([]);
+  const [exploits, setExploits] = useState<ExploitRecord[]>([]);
 
   const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
